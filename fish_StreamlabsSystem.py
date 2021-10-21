@@ -20,7 +20,7 @@ ScriptName = "Fish Game"
 Website = "https://www.twitch.tv/mamamech"
 Description = "TODO"
 Creator = "MamaMech"
-Version = "1.0.0"
+Version = "2.0.0"
 
 # ---------------------------
 #   [Required] Initialize Data (Only called on load)
@@ -35,41 +35,49 @@ def Execute(data):
     pockets = get_pockets()
     museum = get_museum()
     if data.IsChatMessage() and data.GetParam(0).lower() == "!fish" and not Parent.IsOnUserCooldown("Fish Game","!fish",data.User) and (data.UserName not in pockets or pockets[data.UserName]["last_action"] != "fished"):
+#    if data.IsChatMessage() and data.GetParam(0).lower() == "!fish" and (data.UserName not in pockets or pockets[data.UserName]["last_action"] != "fished"):
         choices = []
         for item, weight in loot:
             choices.extend([item] * weight)
-        fish = random.choice( choices )
+        fish = random.choice(choices)
         value = sea[fish]
         write_pockets(data.UserName, fish, "fished")
         Parent.AddUserCooldown("Fish Game", "!fish", data.UserName, 300)
-        Parent.SendStreamMessage(
-            "You caught a " + fish + "! Would you like to \"!sell\" it for " + str(value) + " bells or donate it to the community museum (!blathers)?")
+        if fish not in get_museum():
+            Parent.SendStreamMessage(data.UserName +" caught a " + fish + "! Would you like to \"!sell\" it for " + str(value) + " bells or donate it to the community museum (!blathers)?")
+        else:
+            Parent.SendStreamMessage(data.UserName +" caught a " + fish + "! It is in the museum. Would you like to \"!sell\" it for " + str(value) + " bells?")
     elif data.IsChatMessage() and data.GetParam(0).lower() == "!fish" and pockets[data.UserName]["last_action"] == "fished":
-        Parent.SendStreamMessage("You already have a fish in your pocket. Please \"!sell\" or donate it to \"!blathers\".")
+        Parent.SendStreamMessage(data.UserName +", you already have a fish in your pocket. Please \"!sell\" or donate it to \"!blathers\".")
         return
     elif data.IsChatMessage() and data.GetParam(0).lower() == "!fish" and Parent.IsOnUserCooldown("Fish Game","!fish",data.User):
-        Parent.SendStreamMessage("You are on cooldown. Please wait 5 mins between fishing attempts.")
+        Parent.SendStreamMessage(data.UserName +" is on cooldown. Please wait " + get_cooldown(data) + " before more fish are in the water.")
     elif data.IsChatMessage() and data.GetParam(0).lower() == "!sell":
         if data.UserName in pockets and pockets[data.UserName]["last_action"] == "fished":
             fish = pockets[data.UserName]["fish"]
             value = sea[fish]
             Parent.AddPoints(data.User, data.UserName, value)
             remove_pocket(data.UserName, "sold")
-            Parent.SendStreamMessage("Thank you for your patronage. Here is your " + str(value) + " bells")
+            Parent.SendStreamMessage(data.UserName + ", thank you for your patronage. Here is your " + str(value) + " bells")
         else:
-            Parent.SendStreamMessage("You don't have any fish in your pockets. Try \"!fish\" first!")
+            Parent.SendStreamMessage(data.UserName + " doesn't have any fish in their pockets. Try \"!fish\" first!")
         return
     elif data.IsChatMessage() and data.GetParam(0).lower() == "!blathers":
         if data.UserName in pockets and pockets[data.UserName]["last_action"] == "fished":
             if data.UserName in pockets and pockets[data.UserName]["fish"] in museum:
-                Parent.SendStreamMessage("That has already been donated. You can \"!sell\" it for bells instead.")
+                Parent.SendStreamMessage(data.UserName + ", that has already been donated. You can \"!sell\" it for bells instead.")
             else:
                 add_museum(data.UserName, pockets[data.UserName]["fish"])
                 remove_pocket(data.UserName, "donated")
                 Parent.SendStreamMessage("Yes! We will gladly take these off your hands! ...Ah, there's no need for you to pull them all out! I'll handle the rest from here! Hoot hoo!")
         else:
-            Parent.SendStreamMessage("You don't have any fish in your pockets. Try \"!fish\" first!")
+            Parent.SendStreamMessage(data.UserName + "  doesn't have any fish in their pockets. Try \"!fish\" first!")
         return
+    elif data.IsChatMessage() and data.GetParam(0).lower() == "!museum":
+        all_fish = []
+        for fish in get_museum():
+            all_fish.append(fish)
+        Parent.SendStreamMessage(" - ".join(all_fish))
 
 def write_pockets(UserName, fish, last_action):
     pockets = get_pockets()
@@ -128,11 +136,23 @@ def remove_museum(username):
     return True
 def remove_all_museum():
     return write_museum([])
+
+def get_cooldown(data):
+    cooldown_time = Parent.GetUserCooldownDuration(ScriptName, "!fish", data.User)
+    if cooldown_time <= 60:
+        return str(cooldown_time) + " seconds"
+    else:
+        return str(int(cooldown_time/60)) + " minutes and " + str(cooldown_time%60) + " seconds"
+
 # ---------------------------
 #   [Required] Tick method (Gets called during every iteration even when there is no incoming data)
 # ---------------------------
 def Tick():
     return
+
+# ---------------------------
+#    Dictionaries
+# ---------------------------
 
 #there are plenty of fish in the...
 sea = {"Tadpole":10,
@@ -299,3 +319,51 @@ loot = [("Tadpole", 25),
 ("Great White Shark", 10),
 ("Stringfish", 10),
 ("khervenfish", 1)]
+
+# ---------------------------
+#    Test Code
+# ---------------------------
+#
+#
+# class Data:
+#     message = ""
+#     User = "kherven"
+#     UserName = "kherven"
+#
+#     def __init__(self, message):
+#         self.message = message
+#
+#     def IsChatMessage(self):
+#         return True
+#
+#     def GetParam(self, index):
+#         try:
+#             return self.message.split()[index]
+#         except:
+#             return ""
+#
+# class Parent:
+#     user_points = 5000
+#     user_is_mod = True
+#
+#     def Log(self, message):
+#         return
+#
+#     def SendStreamMessage(self, message):
+#         print(message)
+#
+#     def GetPoints(self, user):
+#         return self.user_points
+#
+#     def RemovePoints(self, user, user_name, point_cost):
+#         self.user_points = 5000 - point_cost
+#
+#     def HasPermission(self, user, perm, ignore):
+#         return self.user_is_mod
+#
+#
+# Init()
+# Parent = Parent()
+# while True:
+#     msg = Data(raw_input())
+#     Execute(msg)
